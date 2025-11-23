@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Razorpay Test</title>
+
+    <!-- Razorpay checkout script (MUST be first and HTTPS safe) -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+
+<body style="font-family: Arial; text-align:center; margin-top:40px;">
+
+    <h2>Test Razorpay Payment</h2>
+    <button id="payBtn" style="padding:12px 22px; font-size:18px;">Pay ₹1</button>
+
+<script>
+document.getElementById("payBtn").onclick = async function () {
+
+    try {
+        // 1) Create order from backend
+        let res = await fetch("https://razorpay-backend-raj.netlify.app/.netlify/functions/create-order", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ amount: 1 })
+        });
+
+        let data = await res.json();
+        console.log("Order API Response:", data);
+
+        if (!data.success || !data.order) {
+            alert("Order create failed ❌");
+            return;
+        }
+
+        let order = data.order;
+
+        // 2) Razorpay checkout setup
+        let options = {
+            key: "rzp_test_RijubWMRKaDIPB",  // YOUR TEST KEY
+            amount: order.amount,
+            currency: "INR",
+            name: "Razorpay Test",
+            description: "Demo Payment",
+            order_id: order.id,
+
+            handler: async function (response) {
+                console.log("Payment Success:", response);
+
+                let verifyRes = await fetch(
+                    "https://razorpay-backend-raj.netlify.app/.netlify/functions/verify-payment",
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                            razorpay_order_id: response.razorpay_order_id,
+                            razorpay_payment_id: response.razorpay_payment_id,
+                            razorpay_signature: response.razorpay_signature
+                        })
+                    }
+                );
+
+                let verifyData = await verifyRes.json();
+                console.log("Verification:", verifyData);
+
+                if (verifyData.success) {
+                    alert("Payment VERIFIED ✔");
+                } else {
+                    alert("Payment verification FAILED ❌");
+                }
+            }
+        };
+
+        // 3) OPEN CHECKOUT
+        let rzp = new Razorpay(options);
+        rzp.open();
+
+    } catch (error) {
+        console.error(error);
+        alert("Something went wrong ❌ : " + error.message);
+    }
+};
+</script>
+
+</body>
+</html>
